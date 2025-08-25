@@ -45,7 +45,7 @@ scipy >= 1.7.0
 
 1. **下載專案**
    ```bash
-   git clone [您的儲存庫URL]
+   git clone https://github.com/QuinnYen/2025-AH_Program.git
    cd AH_MainProgram
    ```
 
