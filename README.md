@@ -134,7 +134,7 @@ tkinter                  # GUI 介面（Python 內建）
 ### 1. 環境建立
 ```bash
 # 克隆專案
-git clone https://github.com/your-username/2025-AH_Program.git
+git clone https://github.com/QuinnYen/2025-AH_Program.git
 cd 2025-AH_Program
 
 # 建立虛擬環境（建議）
