@@ -108,3 +108,6 @@ Thumbs.db
 coverage.xml
 *.cover
 .hypothesis/
+
+# 其他
+/全校課程與學籍1101-1131
