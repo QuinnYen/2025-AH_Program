@@ -254,6 +254,7 @@ class CorrelationAnalysisGUI:
             })
         
         # 4. 按學院分析 (如果選擇)
+        college_results = []  # 新增：儲存學院分析結果
         if self.analyze_by_college.get() and '學院' in df_clean.columns:
             self.update_status("按學院分析...")
             self.update_results("\n=== 按學院分析 ===")
@@ -266,6 +267,14 @@ class CorrelationAnalysisGUI:
                     college_corr = college_data[score_columns].corr()
                     max_corr = college_corr.abs().where(np.triu(np.ones(college_corr.shape), k=1).astype(bool)).max().max()
                     self.update_results(f"{college} (n={len(college_data)}): 最高相關性 = {max_corr:.3f}")
+                    
+                    # 新增：收集學院分析結果
+                    college_results.append({
+                        '學院': college,
+                        '樣本數': len(college_data),
+                        '最高相關性': max_corr,
+                        '相關強度': '強相關' if max_corr >= 0.7 else '中等相關' if max_corr >= 0.3 else '弱相關'
+                    })
         
         # 5. 產生視覺化
         output_dir = os.path.dirname(file_path)
@@ -282,7 +291,7 @@ class CorrelationAnalysisGUI:
         # 6. 匯出Excel結果
         self.update_status("匯出結果...")
         excel_path = os.path.join(output_dir, f"相關性分析結果_{timestamp}.xlsx")
-        self.export_to_excel(pd.DataFrame(results_data), correlation_matrix, excel_path)
+        self.export_to_excel(pd.DataFrame(results_data), correlation_matrix, excel_path, college_results)
         
         # 完成
         self.update_results("\n=== 分析完成 ===")
@@ -339,10 +348,15 @@ class CorrelationAnalysisGUI:
         plt.savefig(save_path, dpi=300, bbox_inches='tight')
         plt.close()
         
-    def export_to_excel(self, results_df, correlation_matrix, file_path):
+    def export_to_excel(self, results_df, correlation_matrix, file_path, college_results=None):
         with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
             results_df.to_excel(writer, sheet_name='詳細相關性分析', index=False)
             correlation_matrix.to_excel(writer, sheet_name='相關性矩陣')
+            
+            # 新增：匯出學院分析結果
+            if college_results:
+                college_df = pd.DataFrame(college_results)
+                college_df.to_excel(writer, sheet_name='學院分析結果', index=False)
             
             # 解釋說明
             interpretation = pd.DataFrame({
