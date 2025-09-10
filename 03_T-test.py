@@ -265,8 +265,7 @@ class TTestAnalyzer:
         ttk.Button(group1_frame, text="一般選修vs通識選修", 
                   command=lambda: self.run_paired_ttest("一般選修", "通識選修")).grid(row=4, column=1, sticky=tk.W, pady=1)
         
-        ttk.Button(group1_frame, text="所有一般vs所有通識", 
-                  command=self.compare_all_general_vs_general_education).grid(row=5, column=0, columnspan=2, sticky=tk.W, pady=1)
+        # 移除重複分析：所有一般vs所有通識（與核心專業vs博雅素養等價）
         
         # 第二類：群體間比較（獨立樣本t-test）
         group2_frame = ttk.LabelFrame(parent, text="第二類：群體間比較（獨立樣本t-test）", padding="5")
@@ -325,6 +324,28 @@ class TTestAnalyzer:
         ttk.Button(group3_frame, text="選修高分生的必修表現", 
                   command=self.analyze_elective_high_performers).grid(row=2, column=0, sticky=tk.W, pady=1)
         
+        # 第四類：跨領域與投入度/穩定度分析
+        group4_frame = ttk.LabelFrame(parent, text="第四類：跨領域與投入度/穩定度分析", padding="5")
+        group4_frame.grid(row=3, column=0, sticky=(tk.W, tk.E), pady=2)
+
+        ttk.Label(group4_frame, text="實驗組合6：跨學科領域表現（獨立樣本t-test）").grid(row=0, column=0, sticky=tk.W)
+        ttk.Button(group4_frame, text="理工組 vs 人文社科（通識課程）",
+                  command=lambda: self.compare_stem_vs_humanities("通識課程")).grid(row=1, column=0, sticky=tk.W, pady=1)
+        ttk.Button(group4_frame, text="理工組 vs 人文社科（一般選修）",
+                  command=lambda: self.compare_stem_vs_humanities("一般選修")).grid(row=1, column=1, sticky=tk.W, pady=1, padx=(10,0))
+
+        ttk.Label(group4_frame, text="實驗組合7：學習表現穩定度（配對t-test）").grid(row=2, column=0, sticky=tk.W, pady=(10,0))
+        ttk.Button(group4_frame, text="個人最高分類別 vs 最低分類別",
+                  command=self.analyze_stability_max_vs_min).grid(row=3, column=0, sticky=tk.W, pady=1)
+
+        ttk.Label(group4_frame, text="實驗組合8：主修與非主修投入度（配對t-test）").grid(row=4, column=0, sticky=tk.W, pady=(10,0))
+        ttk.Button(group4_frame, text="核心專業(一般) vs 博雅素養(通識)",
+                  command=self.compare_major_vs_nonmajor).grid(row=5, column=0, sticky=tk.W, pady=1)
+
+        ttk.Label(group4_frame, text="實驗組合9：頂尖與後段學生的學習差距（獨立樣本t-test）").grid(row=6, column=0, sticky=tk.W, pady=(10,0))
+        ttk.Button(group4_frame, text="(各系)頂尖20% vs 後段20%的『必修-選修』差",
+                  command=self.compare_gap_top_bottom_diff).grid(row=7, column=0, sticky=tk.W, pady=1)
+
         parent.columnconfigure(0, weight=1)
         
     def load_file(self):
@@ -516,47 +537,7 @@ class TTestAnalyzer:
         except Exception as e:
             messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
     
-    def compare_all_general_vs_general_education(self):
-        """比較所有一般課程vs所有通識課程"""
-        if self.data is None:
-            messagebox.showerror("錯誤", "請先載入資料檔案")
-            return
-        
-        try:
-            general_scores = []
-            ge_scores = []
-            
-            for idx, row in self.data.iterrows():
-                gen_scores = [row['一般必修'], row['一般選修']]
-                ge_course_scores = [row['通識必修'], row['通識選修']]
-                
-                gen_valid = [s for s in gen_scores if pd.notna(s)]
-                ge_valid = [s for s in ge_course_scores if pd.notna(s)]
-                
-                if gen_valid and ge_valid:
-                    general_scores.append(np.mean(gen_valid))
-                    ge_scores.append(np.mean(ge_valid))
-            
-            if len(general_scores) < 2:
-                messagebox.showerror("錯誤", "有效配對資料不足")
-                return
-            
-            statistic, p_value = stats.ttest_rel(general_scores, ge_scores)
-            
-            desc_stats = {
-                '所有一般課程_mean': np.mean(general_scores),
-                '所有一般課程_std': np.std(general_scores),
-                '所有通識課程_mean': np.mean(ge_scores),
-                '所有通識課程_std': np.std(ge_scores),
-                'mean_diff': np.mean(general_scores) - np.mean(ge_scores),
-                'n_pairs': len(general_scores)
-            }
-            
-            self.display_ttest_result("配對t-test: 所有一般課程 vs 所有通識課程", 
-                                    statistic, p_value, desc_stats)
-            
-        except Exception as e:
-            messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
+    # 移除重複分析：compare_all_general_vs_general_education（與核心專業vs博雅素養等價）
     
     def compare_selected_colleges(self):
         """比較選定的學院間差異"""
@@ -623,6 +604,196 @@ class TTestAnalyzer:
         except Exception as e:
             messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
     
+    def compare_stem_vs_humanities(self, course_type: str):
+        """跨學科領域表現：理工組 vs 人文社科組（獨立樣本t-test）
+        理工組：理學院、工學院、電機資訊學院
+        人文社科組：商學院、設計學院、人文與教育學院、法學院
+        course_type: "通識課程" 或 "一般選修"
+        """
+        if self.data is None:
+            messagebox.showerror("錯誤", "請先載入資料檔案")
+            return
+        try:
+            stem_colleges = {"理學院", "工學院", "電機資訊學院"}
+            hum_colleges = {"商學院", "設計學院", "人文與教育學院", "法學院"}
+
+            stem_scores = []
+            hum_scores = []
+
+            for _, row in self.data.iterrows():
+                college = row.get('學院')
+                if pd.isna(college):
+                    continue
+
+                if course_type == "通識課程":
+                    scores = [row.get('通識必修'), row.get('通識選修')]
+                    valid = [s for s in scores if pd.notna(s)]
+                    if not valid:
+                        continue
+                    score = np.mean(valid)
+                else:  # 一般選修
+                    score = row.get('一般選修')
+                    if pd.isna(score):
+                        continue
+
+                if college in stem_colleges:
+                    stem_scores.append(score)
+                elif college in hum_colleges:
+                    hum_scores.append(score)
+
+            if len(stem_scores) < 2 or len(hum_scores) < 2:
+                messagebox.showerror("錯誤", f"資料不足：理工組{len(stem_scores)}筆、人文社科組{len(hum_scores)}筆")
+                return
+
+            statistic, p_value = stats.ttest_ind(stem_scores, hum_scores)
+            desc_stats = {
+                '理工組_mean': np.mean(stem_scores),
+                '理工組_std': np.std(stem_scores),
+                '理工組_n': len(stem_scores),
+                '人文社科組_mean': np.mean(hum_scores),
+                '人文社科組_std': np.std(hum_scores),
+                '人文社科組_n': len(hum_scores),
+                'mean_diff': np.mean(stem_scores) - np.mean(hum_scores)
+            }
+
+            self.display_ttest_result(f"獨立樣本t-test: 理工組 vs 人文社科組（{course_type}）", statistic, p_value, desc_stats)
+        except Exception as e:
+            messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
+
+    def analyze_stability_max_vs_min(self):
+        """學習表現穩定度：個人最高分課程類別 vs 最低分課程類別（配對t-test）"""
+        if self.data is None:
+            messagebox.showerror("錯誤", "請先載入資料檔案")
+            return
+        try:
+            max_scores = []
+            min_scores = []
+
+            for _, row in self.data.iterrows():
+                values = [row.get('一般必修'), row.get('一般選修'), row.get('通識必修'), row.get('通識選修')]
+                valid = [v for v in values if pd.notna(v)]
+                if len(valid) < 2:
+                    continue
+                max_scores.append(np.max(valid))
+                min_scores.append(np.min(valid))
+
+            if len(max_scores) < 2:
+                messagebox.showerror("錯誤", "有效配對資料不足")
+                return
+
+            statistic, p_value = stats.ttest_rel(max_scores, min_scores)
+            desc_stats = {
+                '最高分_mean': float(np.mean(max_scores)),
+                '最高分_std': float(np.std(max_scores)),
+                '最低分_mean': float(np.mean(min_scores)),
+                '最低分_std': float(np.std(min_scores)),
+                'mean_diff': float(np.mean(max_scores) - np.mean(min_scores)),
+                'n_pairs': len(max_scores)
+            }
+            self.display_ttest_result("配對t-test: 個人最高分類別 vs 最低分類別", statistic, p_value, desc_stats)
+        except Exception as e:
+            messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
+
+    def compare_major_vs_nonmajor(self):
+        """主修與非主修投入度：核心專業(一般必修+一般選修) vs 博雅素養(通識必修+通識選修)（配對t-test）"""
+        if self.data is None:
+            messagebox.showerror("錯誤", "請先載入資料檔案")
+            return
+        try:
+            major_scores = []
+            nonmajor_scores = []
+
+            for _, row in self.data.iterrows():
+                major = [row.get('一般必修'), row.get('一般選修')]
+                liberal = [row.get('通識必修'), row.get('通識選修')]
+                major_valid = [s for s in major if pd.notna(s)]
+                liberal_valid = [s for s in liberal if pd.notna(s)]
+                if major_valid and liberal_valid:
+                    major_scores.append(float(np.mean(major_valid)))
+                    nonmajor_scores.append(float(np.mean(liberal_valid)))
+
+            if len(major_scores) < 2:
+                messagebox.showerror("錯誤", "有效配對資料不足")
+                return
+
+            statistic, p_value = stats.ttest_rel(major_scores, nonmajor_scores)
+            desc_stats = {
+                '核心專業_mean': float(np.mean(major_scores)),
+                '核心專業_std': float(np.std(major_scores)),
+                '博雅素養_mean': float(np.mean(nonmajor_scores)),
+                '博雅素養_std': float(np.std(nonmajor_scores)),
+                'mean_diff': float(np.mean(major_scores) - np.mean(nonmajor_scores)),
+                'n_pairs': len(major_scores)
+            }
+            self.display_ttest_result("配對t-test: 核心專業(一般) vs 博雅素養(通識)", statistic, p_value, desc_stats)
+        except Exception as e:
+            messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
+
+    def compare_gap_top_bottom_diff(self):
+        """頂尖與後段學生的學習差距：比較『必修平均 - 選修平均』的差（獨立樣本t-test）
+        以各科系為單位選取頂尖20%與後段20%（依科系內GPA），聚合各系後進行整體t-test。
+        """
+        if self.data is None:
+            messagebox.showerror("錯誤", "請先載入資料檔案")
+            return
+        try:
+            top_diffs = []
+            bottom_diffs = []
+
+            for dept in self.data['科系'].dropna().unique():
+                dept_data = self.data[self.data['科系'] == dept].copy()
+                if len(dept_data) < 10:
+                    continue
+
+                # 科系內計算GPA與『必修平均-選修平均』
+                gpa_list = []  # (index, gpa)
+                diff_map = {}  # index -> diff
+                for idx, row in dept_data.iterrows():
+                    scores = [row.get('一般必修'), row.get('一般選修'), row.get('通識必修'), row.get('通識選修')]
+                    valid_scores = [s for s in scores if pd.notna(s)]
+                    if len(valid_scores) < 2:
+                        continue
+                    gpa = float(np.mean(valid_scores))
+                    # 必修平均與選修平均
+                    req_valid = [s for s in [row.get('一般必修'), row.get('通識必修')] if pd.notna(s)]
+                    ele_valid = [s for s in [row.get('一般選修'), row.get('通識選修')] if pd.notna(s)]
+                    if not req_valid or not ele_valid:
+                        continue
+                    diff = float(np.mean(req_valid) - np.mean(ele_valid))
+                    gpa_list.append((idx, gpa))
+                    diff_map[idx] = diff
+
+                if len(gpa_list) < 10:
+                    continue
+
+                gpa_list.sort(key=lambda x: x[1])
+                n = len(gpa_list)
+                bottom_20 = int(n * 0.2)
+                top_20 = int(n * 0.8)
+                bottom_ids = [i for i, _ in gpa_list[:bottom_20]]
+                top_ids = [i for i, _ in gpa_list[top_20:]]
+
+                top_diffs.extend([diff_map[i] for i in top_ids if i in diff_map])
+                bottom_diffs.extend([diff_map[i] for i in bottom_ids if i in diff_map])
+
+            if len(top_diffs) < 2 or len(bottom_diffs) < 2:
+                messagebox.showerror("錯誤", f"資料不足：頂尖組{len(top_diffs)}筆、後段組{len(bottom_diffs)}筆")
+                return
+
+            statistic, p_value = stats.ttest_ind(top_diffs, bottom_diffs)
+            desc_stats = {
+                '頂尖組_mean': float(np.mean(top_diffs)),
+                '頂尖組_std': float(np.std(top_diffs)),
+                '頂尖組_n': len(top_diffs),
+                '後段組_mean': float(np.mean(bottom_diffs)),
+                '後段組_std': float(np.std(bottom_diffs)),
+                '後段組_n': len(bottom_diffs),
+                'mean_diff': float(np.mean(top_diffs) - np.mean(bottom_diffs))
+            }
+            self.display_ttest_result("獨立樣本t-test: (各系)頂尖20% vs 後段20%的『必修-選修』差", statistic, p_value, desc_stats)
+        except Exception as e:
+            messagebox.showerror("錯誤", f"分析時發生錯誤: {str(e)}")
+
     def compare_gpa_groups(self):
         """比較高GPA vs 低GPA學生"""
         if self.data is None:
@@ -972,17 +1143,33 @@ class TTestAnalyzer:
         current_step = 0
         
         # 計算總步驟數
-        paired_tests_count = 6  # 基本配對測試
+        # 第一類：基礎課程類型比較（4個配對測試）
+        basic_paired_tests = 4
+        # 第二類：制度性分析（1個）
+        institutional_analysis = 1  # 所有必修vs所有選修
+        # 第三類：學科性質分析（1個）
+        discipline_analysis = 1  # 專業課程vs通識課程
+        # 第四類：個人學習穩定度分析（1個）
+        stability_analysis = 1  # 最高vs最低分類別
+        # 第五類：跨學科領域比較（1個）
+        interdisciplinary_analysis = 1  # 理工vs人文社科
+        # 第六類：學習能力分層分析（4個）
+        performance_tier_analysis = 4  # 6a.各系頂尖vs後段各科目 + 6b.必修選修差 + 6c.高低GPA + 6d.必修高分學生選修表現
+        # 第七類：學院間比較分析
         colleges_count = 7
         college_combinations = (colleges_count * (colleges_count - 1)) // 2  # 21組合
         course_types_count = 4
-        total_college_tests = college_combinations * course_types_count  # 84個測試
-        total_steps = paired_tests_count + total_college_tests
+        college_comparison_tests = college_combinations * course_types_count  # 84個測試
+        
+        total_steps = (basic_paired_tests + institutional_analysis + discipline_analysis + 
+                      stability_analysis + interdisciplinary_analysis + performance_tier_analysis + 
+                      college_comparison_tests)
         
         logger.info(f"預計執行 {total_steps} 項分析")
         
         try:
-            # 第一類：課程類型比較（配對t-test）
+            # ========== 第一類：基礎課程類型比較（配對t-test）==========
+            # 目的：細分比較各種課程類型之間的表現差異
             paired_tests = [
                 ("一般必修", "一般選修"),
                 ("通識必修", "通識選修"),
@@ -990,7 +1177,7 @@ class TTestAnalyzer:
                 ("一般選修", "通識選修")
             ]
             
-            logger.info("執行配對t-test分析")
+            logger.info("執行基礎課程類型配對t-test分析")
             for i, (col1, col2) in enumerate(paired_tests):
                 if self.operation_cancelled:
                     logger.info("操作被取消")
@@ -1029,10 +1216,11 @@ class TTestAnalyzer:
                     logger.error(f"分析 {col1} vs {col2} 時發生錯誤: {str(e)}")
                     continue
             
-            # 所有必修vs所有選修
+            # ========== 第二類：制度性分析（配對t-test）==========
+            # 目的：從必修/選修制度角度分析整體學習成效差異
             current_step += 1
             if progress_callback:
-                progress_callback(current_step, "分析所有必修vs所有選修")
+                progress_callback(current_step, "制度分析: 所有必修課程 vs 所有選修課程")
             
             try:
                 logger.debug("分析所有必修vs所有選修")
@@ -1055,7 +1243,7 @@ class TTestAnalyzer:
                     
                     all_results["配對t-test_所有必修_vs_所有選修"] = {
                         'type': 'paired_ttest',
-                        'comparison': "所有必修 vs 所有選修",
+                        'comparison': "所有必修 vs 所有選修（制度性分析）",
                         'statistic': statistic,
                         'p_value': p_value,
                         'mean1': np.mean(required_scores),
@@ -1072,50 +1260,332 @@ class TTestAnalyzer:
             except Exception as e:
                 logger.error(f"分析所有必修vs所有選修時發生錯誤: {str(e)}")
             
-            # 所有一般vs所有通識
+            # ========== 第三類：學科性質分析（配對t-test）==========
+            # 目的：比較專業教育與通識教育的整體學習成效
             current_step += 1
             if progress_callback:
-                progress_callback(current_step, "分析所有一般vs所有通識")
-                
+                progress_callback(current_step, "配對t-test: 專業課程整體 vs 通識課程整體")
             try:
-                logger.debug("分析所有一般vs所有通識")
-                general_scores = []
-                ge_scores = []
-                
-                for idx, row in self.data.iterrows():
-                    gen_scores = [row['一般必修'], row['一般選修']]
-                    ge_course_scores = [row['通識必修'], row['通識選修']]
-                    
-                    gen_valid = [s for s in gen_scores if pd.notna(s)]
-                    ge_valid = [s for s in ge_course_scores if pd.notna(s)]
-                    
-                    if gen_valid and ge_valid:
-                        general_scores.append(np.mean(gen_valid))
-                        ge_scores.append(np.mean(ge_valid))
-                
-                if len(general_scores) >= 2:
-                    statistic, p_value = stats.ttest_rel(general_scores, ge_scores)
-                    
-                    all_results["配對t-test_所有一般_vs_所有通識"] = {
+                major_scores, liberal_scores = [], []
+                for _, row in self.data.iterrows():
+                    # 專業課程：一般必修+一般選修的平均
+                    major = [row.get('一般必修'), row.get('一般選修')]
+                    # 通識課程：通識必修+通識選修的平均
+                    liberal = [row.get('通識必修'), row.get('通識選修')]
+                    major_valid = [s for s in major if pd.notna(s)]
+                    liberal_valid = [s for s in liberal if pd.notna(s)]
+                    if major_valid and liberal_valid:
+                        major_scores.append(float(np.mean(major_valid)))
+                        liberal_scores.append(float(np.mean(liberal_valid)))
+                if len(major_scores) >= 2:
+                    statistic, p_value = stats.ttest_rel(major_scores, liberal_scores)
+                    all_results["配對t-test_專業課程整體_vs_通識課程整體"] = {
                         'type': 'paired_ttest',
-                        'comparison': "所有一般課程 vs 所有通識課程",
+                        'comparison': "專業課程整體 vs 通識課程整體",
                         'statistic': statistic,
                         'p_value': p_value,
-                        'mean1': np.mean(general_scores),
-                        'std1': np.std(general_scores),
-                        'mean2': np.mean(ge_scores),
-                        'std2': np.std(ge_scores),
-                        'mean_diff': np.mean(general_scores) - np.mean(ge_scores),
-                        'n_pairs': len(general_scores),
+                        'mean1': float(np.mean(major_scores)),
+                        'std1': float(np.std(major_scores)),
+                        'mean2': float(np.mean(liberal_scores)),
+                        'std2': float(np.std(liberal_scores)),
+                        'mean_diff': float(np.mean(major_scores) - np.mean(liberal_scores)),
+                        'n_pairs': len(major_scores),
                         'significance': self._get_significance(p_value)
                     }
-                    logger.debug(f"完成所有一般vs所有通識, p={p_value:.4f}")
-                else:
-                    logger.warning(f"所有一般vs所有通識: 有效資料不足 ({len(general_scores)}筆)")
             except Exception as e:
-                logger.error(f"分析所有一般vs所有通識時發生錯誤: {str(e)}")
+                logger.error(f"分析專業課程 vs 通識課程時發生錯誤: {str(e)}")
+
+            # ========== 第四類：個人學習穩定度分析（配對t-test）==========
+            # 目的：分析個人在不同課程類型間的學習表現穩定性
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "配對t-test: 個人最高分類別 vs 最低分類別")
+            try:
+                max_scores, min_scores = [], []
+                for _, row in self.data.iterrows():
+                    values = [row.get('一般必修'), row.get('一般選修'), row.get('通識必修'), row.get('通識選修')]
+                    valid = [v for v in values if pd.notna(v)]
+                    if len(valid) < 2:
+                        continue
+                    max_scores.append(float(np.max(valid)))
+                    min_scores.append(float(np.min(valid)))
+                if len(max_scores) >= 2:
+                    statistic, p_value = stats.ttest_rel(max_scores, min_scores)
+                    all_results["配對t-test_最高分類別_vs_最低分類別"] = {
+                        'type': 'paired_ttest',
+                        'comparison': "個人最高分類別 vs 最低分類別",
+                        'statistic': statistic,
+                        'p_value': p_value,
+                        'mean1': float(np.mean(max_scores)),
+                        'std1': float(np.std(max_scores)),
+                        'mean2': float(np.mean(min_scores)),
+                        'std2': float(np.std(min_scores)),
+                        'mean_diff': float(np.mean(max_scores) - np.mean(min_scores)),
+                        'n_pairs': len(max_scores),
+                        'significance': self._get_significance(p_value)
+                    }
+            except Exception as e:
+                logger.error(f"分析學習表現穩定度時發生錯誤: {str(e)}")
+
+            # ========== 第五類：跨學科領域比較（獨立樣本t-test）==========
+            # 目的：比較理工學科與人文社科學生的整體學習表現
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "跨學科領域表現: 理工組 vs 人文社科組 (整合所有課程)")
+            try:
+                stem_colleges = {"理學院", "工學院", "電機資訊學院"}
+                hum_colleges = {"商學院", "設計學院", "人文與教育學院", "法學院"}
+                stem_scores, hum_scores = [], []
+                for _, row in self.data.iterrows():
+                    college = row.get('學院')
+                    if pd.isna(college):
+                        continue
+                    # 整合所有課程類型的平均分數
+                    all_scores = [row.get('一般必修'), row.get('一般選修'), row.get('通識必修'), row.get('通識選修')]
+                    valid_scores = [s for s in all_scores if pd.notna(s)]
+                    if len(valid_scores) < 2:
+                        continue
+                    overall_score = float(np.mean(valid_scores))
+                    if college in stem_colleges:
+                        stem_scores.append(overall_score)
+                    elif college in hum_colleges:
+                        hum_scores.append(overall_score)
+                if len(stem_scores) >= 2 and len(hum_scores) >= 2:
+                    statistic, p_value = stats.ttest_ind(stem_scores, hum_scores)
+                    all_results["獨立樣本t-test_理工組_vs_人文社科組_整合表現"] = {
+                        'type': 'independent_ttest',
+                        'comparison': "理工組 vs 人文社科組（整合所有課程表現）",
+                        'statistic': statistic,
+                        'p_value': p_value,
+                        'mean1': float(np.mean(stem_scores)),
+                        'std1': float(np.std(stem_scores)),
+                        'n1': len(stem_scores),
+                        'mean2': float(np.mean(hum_scores)),
+                        'std2': float(np.std(hum_scores)),
+                        'n2': len(hum_scores),
+                        'mean_diff': float(np.mean(stem_scores) - np.mean(hum_scores)),
+                        'significance': self._get_significance(p_value)
+                    }
+            except Exception as e:
+                logger.error(f"分析跨學科領域表現時發生錯誤: {str(e)}")
+
+            # ========== 第六類：學習能力分層分析（獨立樣本t-test）==========
+            # 目的：比較頂尖學生與後段學生的學習表現差異
             
-            # 第二類：學院間比較
+            # 6a. 各系頂尖20% vs 後段20%學生（各科目成績比較）
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "各系頂尖20% vs 後段20%學生 (各科目)")
+            try:
+                departments = self.data['科系'].dropna().unique()
+                subjects = ['一般必修', '一般選修', '通識必修', '通識選修']
+                
+                for dept in departments:
+                    dept_data = self.data[self.data['科系'] == dept].copy()
+                    if len(dept_data) < 10:
+                        continue
+                    
+                    # 計算科系內GPA並排序
+                    gpa_scores = []
+                    for idx, row in dept_data.iterrows():
+                        scores = [row['一般必修'], row['一般選修'], row['通識必修'], row['通識選修']]
+                        valid_scores = [s for s in scores if pd.notna(s)]
+                        if len(valid_scores) >= 2:
+                            gpa_scores.append((idx, np.mean(valid_scores)))
+                    
+                    if len(gpa_scores) < 10:
+                        continue
+                    
+                    gpa_scores.sort(key=lambda x: x[1])
+                    n = len(gpa_scores)
+                    bottom_20_percent = int(n * 0.2)
+                    top_20_percent = int(n * 0.8)
+                    
+                    bottom_indices = [x[0] for x in gpa_scores[:bottom_20_percent]]
+                    top_indices = [x[0] for x in gpa_scores[top_20_percent:]]
+                    
+                    # 對每個科目進行 t-test
+                    for subject in subjects:
+                        top_scores = [self.data.loc[i, subject] for i in top_indices 
+                                     if pd.notna(self.data.loc[i, subject])]
+                        bottom_scores = [self.data.loc[i, subject] for i in bottom_indices 
+                                       if pd.notna(self.data.loc[i, subject])]
+                        
+                        if len(top_scores) >= 2 and len(bottom_scores) >= 2:
+                            statistic, p_value = stats.ttest_ind(top_scores, bottom_scores)
+                            result_key = f"獨立樣本t-test_{dept}_頂尖vs後段_{subject}"
+                            all_results[result_key] = {
+                                'type': 'independent_ttest',
+                                'comparison': f"{dept} 頂尖20% vs 後段20% ({subject})",
+                                'statistic': statistic,
+                                'p_value': p_value,
+                                'mean1': float(np.mean(top_scores)),
+                                'std1': float(np.std(top_scores)),
+                                'n1': len(top_scores),
+                                'mean2': float(np.mean(bottom_scores)),
+                                'std2': float(np.std(bottom_scores)),
+                                'n2': len(bottom_scores),
+                                'mean_diff': float(np.mean(top_scores) - np.mean(bottom_scores)),
+                                'significance': self._get_significance(p_value)
+                            }
+            except Exception as e:
+                logger.error(f"分析各系頂尖vs後段學生時發生錯誤: {str(e)}")
+            
+            # 6b. 各系頂尖20% vs 後段20%的『必修-選修』差異
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "(各系)頂尖20% vs 後段20% 的『必修-選修』差")
+            try:
+                top_diffs, bottom_diffs = [], []
+                for dept in self.data['科系'].dropna().unique():
+                    dept_data = self.data[self.data['科系'] == dept].copy()
+                    if len(dept_data) < 10:
+                        continue
+                    gpa_list = []
+                    diff_map = {}
+                    for idx, row in dept_data.iterrows():
+                        scores = [row.get('一般必修'), row.get('一般選修'), row.get('通識必修'), row.get('通識選修')]
+                        valid_scores = [s for s in scores if pd.notna(s)]
+                        if len(valid_scores) < 2:
+                            continue
+                        gpa = float(np.mean(valid_scores))
+                        req_valid = [s for s in [row.get('一般必修'), row.get('通識必修')] if pd.notna(s)]
+                        ele_valid = [s for s in [row.get('一般選修'), row.get('通識選修')] if pd.notna(s)]
+                        if not req_valid or not ele_valid:
+                            continue
+                        diff = float(np.mean(req_valid) - np.mean(ele_valid))
+                        gpa_list.append((idx, gpa))
+                        diff_map[idx] = diff
+                    if len(gpa_list) < 10:
+                        continue
+                    gpa_list.sort(key=lambda x: x[1])
+                    n = len(gpa_list)
+                    bottom_20 = int(n * 0.2)
+                    top_20 = int(n * 0.8)
+                    bottom_ids = [i for i, _ in gpa_list[:bottom_20]]
+                    top_ids = [i for i, _ in gpa_list[top_20:]]
+                    top_diffs.extend([diff_map[i] for i in top_ids if i in diff_map])
+                    bottom_diffs.extend([diff_map[i] for i in bottom_ids if i in diff_map])
+                if len(top_diffs) >= 2 and len(bottom_diffs) >= 2:
+                    statistic, p_value = stats.ttest_ind(top_diffs, bottom_diffs)
+                    all_results["獨立樣本t-test_頂尖20%_vs_後段20%_必修減選修之差"] = {
+                        'type': 'independent_ttest',
+                        'comparison': "(各系)頂尖20% vs 後段20%的『必修-選修』差",
+                        'statistic': statistic,
+                        'p_value': p_value,
+                        'mean1': float(np.mean(top_diffs)),
+                        'std1': float(np.std(top_diffs)),
+                        'n1': len(top_diffs),
+                        'mean2': float(np.mean(bottom_diffs)),
+                        'std2': float(np.std(bottom_diffs)),
+                        'n2': len(bottom_diffs),
+                        'mean_diff': float(np.mean(top_diffs) - np.mean(bottom_diffs)),
+                        'significance': self._get_significance(p_value)
+                    }
+            except Exception as e:
+                logger.error(f"分析頂尖與後段學生的『必修-選修』差時發生錯誤: {str(e)}")
+            
+            # 6c. 高GPA vs 低GPA學生比較
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "高GPA vs 低GPA學生比較")
+            try:
+                gpa_list = []
+                for idx, row in self.data.iterrows():
+                    scores = [row['一般必修'], row['一般選修'], row['通識必修'], row['通識選修']]
+                    valid_scores = [s for s in scores if pd.notna(s)]
+                    if len(valid_scores) >= 2:
+                        gpa_list.append((idx, np.mean(valid_scores)))
+                
+                if len(gpa_list) >= 20:
+                    gpa_list.sort(key=lambda x: x[1])
+                    n = len(gpa_list)
+                    low_30_percent = int(n * 0.3)
+                    high_30_percent = int(n * 0.7)
+                    
+                    low_gpa_indices = [x[0] for x in gpa_list[:low_30_percent]]
+                    high_gpa_indices = [x[0] for x in gpa_list[high_30_percent:]]
+                    
+                    subjects = ['一般必修', '一般選修', '通識必修', '通識選修']
+                    for subject in subjects:
+                        high_scores = [self.data.loc[i, subject] for i in high_gpa_indices 
+                                      if pd.notna(self.data.loc[i, subject])]
+                        low_scores = [self.data.loc[i, subject] for i in low_gpa_indices 
+                                     if pd.notna(self.data.loc[i, subject])]
+                        
+                        if len(high_scores) >= 2 and len(low_scores) >= 2:
+                            statistic, p_value = stats.ttest_ind(high_scores, low_scores)
+                            result_key = f"獨立樣本t-test_高GPA_vs_低GPA_{subject}"
+                            all_results[result_key] = {
+                                'type': 'independent_ttest',
+                                'comparison': f"高GPA vs 低GPA ({subject})",
+                                'statistic': statistic,
+                                'p_value': p_value,
+                                'mean1': float(np.mean(high_scores)),
+                                'std1': float(np.std(high_scores)),
+                                'n1': len(high_scores),
+                                'mean2': float(np.mean(low_scores)),
+                                'std2': float(np.std(low_scores)),
+                                'n2': len(low_scores),
+                                'mean_diff': float(np.mean(high_scores) - np.mean(low_scores)),
+                                'significance': self._get_significance(p_value)
+                            }
+            except Exception as e:
+                logger.error(f"分析高GPA vs 低GPA時發生錯誤: {str(e)}")
+            
+            # 6d. 必修高分學生的選修表現
+            current_step += 1
+            if progress_callback:
+                progress_callback(current_step, "必修高分學生的選修課表現分析")
+            try:
+                required_avg = []
+                for idx, row in self.data.iterrows():
+                    req_scores = [row['一般必修'], row['通識必修']]
+                    valid_req = [s for s in req_scores if pd.notna(s)]
+                    if valid_req:
+                        required_avg.append((idx, np.mean(valid_req)))
+                
+                if len(required_avg) >= 10:
+                    required_avg.sort(key=lambda x: x[1], reverse=True)
+                    top_30_percent = int(len(required_avg) * 0.3)
+                    high_required_students = [x[0] for x in required_avg[:top_30_percent]]
+                    
+                    elective_scores = []
+                    for idx in high_required_students:
+                        row = self.data.loc[idx]
+                        elec_scores = [row['一般選修'], row['通識選修']]
+                        valid_elec = [s for s in elec_scores if pd.notna(s)]
+                        if valid_elec:
+                            elective_scores.append(np.mean(valid_elec))
+                    
+                    overall_elective = []
+                    for idx, row in self.data.iterrows():
+                        elec_scores = [row['一般選修'], row['通識選修']]
+                        valid_elec = [s for s in elec_scores if pd.notna(s)]
+                        if valid_elec:
+                            overall_elective.append(np.mean(valid_elec))
+                    
+                    if len(elective_scores) >= 2 and len(overall_elective) >= 2:
+                        statistic, p_value = stats.ttest_ind(elective_scores, overall_elective)
+                        all_results["配對t-test_必修高分學生選修表現_vs_整體選修表現"] = {
+                            'type': 'independent_ttest',
+                            'comparison': "必修高分學生選修表現 vs 整體選修表現",
+                            'statistic': statistic,
+                            'p_value': p_value,
+                            'mean1': float(np.mean(elective_scores)),
+                            'std1': float(np.std(elective_scores)),
+                            'n1': len(elective_scores),
+                            'mean2': float(np.mean(overall_elective)),
+                            'std2': float(np.std(overall_elective)),
+                            'n2': len(overall_elective),
+                            'mean_diff': float(np.mean(elective_scores) - np.mean(overall_elective)),
+                            'significance': self._get_significance(p_value)
+                        }
+            except Exception as e:
+                logger.error(f"分析必修高分學生選修表現時發生錯誤: {str(e)}")
+
+            # ========== 第七類：學院間比較分析（獨立樣本t-test）==========
+            # 目的：比較不同學院學生在各課程類型的學習表現差異
             colleges = ["理學院", "工學院", "商學院", "設計學院", "人文與教育學院", "法學院", "電機資訊學院"]
             course_types = ["一般必修", "一般選修", "通識必修", "通識選修"]
             
@@ -1329,6 +1799,22 @@ class TTestAnalyzer:
                 # 6. 資料摘要統計
                 summary_stats = self.data[['一般必修', '一般選修', '通識必修', '通識選修']].describe()
                 summary_stats.to_excel(writer, sheet_name='資料摘要統計')
+
+                # 7. 當前分析（若有）
+                if self.current_analysis_result is not None:
+                    try:
+                        current_df = pd.DataFrame([
+                            {
+                                '分析標題': self.current_analysis_result.get('title', ''),
+                                '顯著性': self.current_analysis_result.get('significance', ''),
+                                't統計量': f"{self.current_analysis_result.get('statistic', np.nan):.4f}",
+                                'p值': f"{self.current_analysis_result.get('p_value', np.nan):.4f}",
+                                '時間戳': self.current_analysis_result.get('timestamp', '')
+                            }
+                        ])
+                        current_df.to_excel(writer, sheet_name='當前分析', index=False)
+                    except Exception:
+                        pass
             
             self.update_progress(7, "完成!")
             self.close_progress_window()
@@ -1356,6 +1842,7 @@ class TTestAnalyzer:
         self.result_text.delete(1.0, tk.END)
         self.current_analysis_result = None
         messagebox.showinfo("完成", "分析結果已清空")
+
 
 def main():
     logger.info("=" * 50)
